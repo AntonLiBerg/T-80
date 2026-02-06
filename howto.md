@@ -1,3 +1,8 @@
+# Todo
+Next steps (future work)
+   - Add PTY support for better interactive sessions.
+   - Add `exec` and/or `sftp` support.
+   - Lock down and explicitly deny port forwarding.
 # How To Run The SSH Server
 
 1. Setup environment
@@ -22,7 +27,6 @@
    ```bash
    npm run dev
    ```
-   You should see `SSH server listening on port 2222`.
 
 5. Connect to the server
    In another terminal:
@@ -33,3 +37,4 @@
 
 6. Stop the server
    Press `Ctrl+C` in the server terminal.
+

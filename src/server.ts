@@ -25,8 +25,8 @@ new Server({ hostKeys: [hostKey] }, (client) => {
     });
   });
 })
-  .listen(2222, "0.0.0.0", () => {
-    console.log("SSH server listening on port 2222");
-  });
+.listen(2222, "0.0.0.0", () => {
+  console.log("SSH server listening on port 2222");
+});
 
 
