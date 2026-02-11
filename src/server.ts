@@ -1,8 +1,13 @@
 import { readFileSync } from "node:fs";
-import { Server } from "ssh2";
+import { Server, type Session } from "ssh2";
 
+const SESSION_NR_MAX = 50;
+const SESSION_IDLE_MAX_MS = 60*10*1000;
 const hostKey = readFileSync("./host.key");
+let sessions = new Set<Session>()
 
+
+// Setup the server and accept only those with the correct login
 new Server({ hostKeys: [hostKey] }, (client) => {
   client.on("authentication", (ctx) => {
     if (ctx.method === "password" && ctx.username === "test" && ctx.password === "test") {
@@ -12,21 +17,60 @@ new Server({ hostKeys: [hostKey] }, (client) => {
     }
   });
 
+  //Setup the session
   client.on("ready", () => {
-    client.on("session", (accept) => {
-      const session = accept();
-      session.on("shell", (accept) => {
-        const stream = accept();
-        stream.write("Welcome!\r\n");
-        stream.on("data", (data: Buffer) => {
-          stream.write(data);
-        });
-      });
+    client.on("session", (accept,reject) => {
+       if(sessions.size >= SESSION_NR_MAX){
+          reject();
+          return;
+       }
+       const session = accept();
+       sessions.add(session);
+
+       // Remove sessions where the user is idle for too long
+       let idleTimer: NodeJS.Timeout
+       const resetIdleTimer = () => {
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(() => {
+             session.close();
+          }, SESSION_IDLE_MAX_MS);
+       };
+
+       // Cleanup when the session closes
+       const cleanup = ()=>{ 
+          clearTimeout(idleTimer);
+          sessions.delete(session);
+       }
+       session.on("close", cleanup)
+       session.on("end",cleanup)
+       session.on("error",cleanup)
+       
+       //Start accepting traffic
+       resetIdleTimer();
+       session.on("shell", (accept) => {
+          const stream = accept();
+          resetIdleTimer();
+          stream.write(emptyUI);
+          stream.on("data", (data: Buffer) => {
+             resetIdleTimer();
+
+          });
+       });
+
     });
   });
 })
 .listen(2222, "0.0.0.0", () => {
-  console.log("SSH server listening on port 2222");
+   console.log("SSH server listening on port 2222");
 });
+
+
+const emptyUI = 
+`==================================================
+                     VIM-IRO
+==================================================
+
+`;
+
 
 
