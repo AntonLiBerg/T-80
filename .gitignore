@@ -16,3 +16,7 @@ coverage/
 *.tsbuildinfo
 
 host.key
+
+# Local Docker Compose overrides
+docker-compose.override.yml
+docker-compose.override.yaml
