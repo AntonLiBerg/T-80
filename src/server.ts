@@ -3,30 +3,32 @@ import { Server, type Session } from "ssh2";
 
 const SESSION_NR_MAX = 50;
 const SESSION_IDLE_MAX_MS = 60*10*1000;
-const UIWidth = 30;
-const UIHeight = 30;
-const emptyUI = 
+const UIWIDTH = 60;
+const UIHEIGHT = 30;
+const ROWMIDDLE = 30;
+type VaultEntry = {
+   key: string;
+   value: string;
+};
 
-`=
-                     VIM-IRO
-==================================================
-
-`;
-interface State  {
-  cUI_z0: string,
-  cUI_z1: string,
-  displayed: Set<string>
-}
-const state :State = {
-    cUI_z0: emptyUI as string,
-    cUI_z1: "" as string,
-    displayed: new Set<string>
-}
 const hostKey = readFileSync("./host.key");
 let sessions = new Set<Session>()
+const vaultEntries: VaultEntry[] = [
+   { key: "MyTestPassword", value: "passWOrd1234" },
+   { key: "MyOtherTestPassword", value: "passWOrd1234" },
+   { key: "MyFirstTestPassword", value: "passWOrd1234" },
+];
 
 // Setup the server and accept only those with the correct login
 new Server({ hostKeys: [hostKey] }, (client) => {
+   client.on("error", (err: NodeJS.ErrnoException & { level?: string }) => {
+      // Common when a TCP client disconnects before completing the SSH handshake.
+      if (err.code === "ECONNRESET") {
+         return;
+      }
+      console.error("SSH client error:", err);
+   });
+
    client.on("authentication", (ctx) => {
       if (ctx.method === "password" && ctx.username === "test" && ctx.password === "test") {
          ctx.accept();
@@ -68,13 +70,12 @@ new Server({ hostKeys: [hostKey] }, (client) => {
          session.on("shell", (accept) => {
             const stream = accept();
             resetIdleTimer();
-            stream.write(state.cUI);
+            stream.write(makeUI(vaultEntries));
             stream.on("data", (data: Buffer) => {
                resetIdleTimer();
 
             });
          });
-
       });
    });
 })
@@ -82,14 +83,29 @@ new Server({ hostKeys: [hostKey] }, (client) => {
    console.log("SSH server listening on port 2222");
 });
 
-function displayPopup(text: string,state:State){ 
-   const displayId = "popup center"
-   if(state.displayed.has(displayId))
-      throw new Error("already displayed!")
-   state.cUI_z1 = overwriteAt(state.cUI_z1,   
+
+function makeAsciiRow(colStart:number,text:string){
+   const safeColStart = Math.max(0, colStart);
+   const padding = Math.max(0, UIWIDTH - safeColStart - text.length);
+   return " ".repeat(safeColStart)+text+" ".repeat(padding)+"\n";
 }
 
-function overwriteAt(str: string, index: number, text: string): string {
-   return str.slice(0, index) + text + str.slice(index + text.length);
-}
+function makeUI(entries: VaultEntry[]) : string {
+   let ascii = makeAsciiRow(0,"=".repeat(UIWIDTH))
+   + makeAsciiRow(ROWMIDDLE - 7,"SSH SECRET VAULT")
+   + makeAsciiRow(0,"=".repeat(UIWIDTH))
+   + makeAsciiRow(0,"")
+   + makeAsciiRow(5,"Key                  Value");
 
+   for (const entry of entries) {
+      ascii += makeAsciiRow(5, `${entry.key.padEnd(20, " ")} ${entry.value}`);
+   }
+
+   const rowsBeforePadding = 5 + entries.length;
+   const blankRows = Math.max(0, UIHEIGHT - rowsBeforePadding - 1);
+   for(let i = 0;i<blankRows; i++){
+      ascii += makeAsciiRow(0,"")
+   }
+   ascii += makeAsciiRow(0,"=".repeat(UIWIDTH))
+   return ascii
+}
