@@ -6,6 +6,7 @@ services:
     volumes:
       - registry_data:/var/lib/registry
     restart: unless-stopped
+
   db:
     image: postgres:16
     environment:

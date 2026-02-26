@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { Server, type Session } from "ssh2";
+import * as pg from "pg";
 
 const SESSION_NR_MAX = 50;
 const SESSION_IDLE_MAX_MS = 60*10*1000;
@@ -73,6 +74,7 @@ new Server({ hostKeys: [hostKey] }, (client) => {
             stream.write(makeUI(vaultEntries));
             stream.on("data", (data: Buffer) => {
                resetIdleTimer();
+               stream.write("OK!")
 
             });
          });
@@ -108,4 +110,21 @@ function makeUI(entries: VaultEntry[]) : string {
    }
    ascii += makeAsciiRow(0,"=".repeat(UIWIDTH))
    return ascii
+}
+
+const db = new pg.Client({
+    host: "localhost",
+    port: 5432,
+    database: "t80",
+    user: "t80",
+    password: "t80dev",
+})
+
+async function addKvp(key:string,val:string): Promise<string>{
+   db.connect()
+   const {rows} = await db.query(`
+      INSERT INTO kvp (key,value)
+      VALUES($1,$2)
+      `,[key,val]);
+   return rows[0];
 }
