@@ -74,7 +74,7 @@ new Server({ hostKeys: [hostKey] }, (client) => {
             stream.write(makeUI(vaultEntries));
             stream.on("data", (data: Buffer) => {
                resetIdleTimer();
-               stream.write("OK!")
+               stream.write(data)
 
             });
          });
@@ -109,6 +109,10 @@ function makeUI(entries: VaultEntry[]) : string {
       ascii += makeAsciiRow(0,"")
    }
    ascii += makeAsciiRow(0,"=".repeat(UIWIDTH))
+   ascii += makeAsciiRow(0,"Write command and press enter to perform:")
+   ascii += makeAsciiRow(1,"- Add key value: add new kvp to the vault")
+   ascii += makeAsciiRow(0,"")
+
    return ascii
 }
 
