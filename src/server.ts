@@ -90,6 +90,8 @@ new Server({ hostKeys: [hostKey] }, (client) => {
                   const isOk = await handler(args)
                   if(isOk)
                      stream.write("succesfully ran: "+cmdStrMsg)
+                  else
+                     stream.write("command failed: "+cmdStrMsg)
                }catch(err){
                   stream.write("internal error!")
                }
@@ -137,11 +139,11 @@ const commands: Record<string, (args: string[]) => Promise<boolean>> = {
 }
 
 const db = new pg.Client({
-   host: "localhost",
-   port: 5432,
-   database: "t80",
-   user: "t80",
-   password: "t80dev",
+   host: process.env.PGHOST ?? "localhost",
+   port: Number(process.env.PGPORT ?? "5432"),
+   database: process.env.PGDATABASE ?? "t80",
+   user: process.env.PGUSER ?? "t80",
+   password: process.env.PGPASSWORD ?? "t80dev",
 })
 
 let dbReady: Promise<void> | null = null;
