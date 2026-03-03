@@ -30,7 +30,7 @@ new Server({ hostKeys: [hostKey] }, (client) => {
       console.error("SSH client error:", err);
    });
 
-   client.on("authentication", (ctx) => {
+   client.on("authentication",(ctx) => {
       if (ctx.method === "password" && ctx.username === "test" && ctx.password === "test") {
          ctx.accept();
       } else {
@@ -72,10 +72,27 @@ new Server({ hostKeys: [hostKey] }, (client) => {
             const stream = accept();
             resetIdleTimer();
             stream.write(makeUI(vaultEntries));
-            stream.on("data", (data: Buffer) => {
-               resetIdleTimer();
-               stream.write(data)
+            stream.on("data", async (data: Buffer) => {
+               try{
+                  resetIdleTimer();
+                  const split = data.toString().split(" ")
+                  const cmd = split[0]
+                  const args = split.slice(1)
+                  const cmdStrMsg = cmd + "with args: " + args.join(",")
+                  stream.write("trying command: " + cmdStrMsg)
 
+                  const handler = cmd ? commands[cmd] : undefined
+                  if (!handler) {
+                     stream.write("command "+cmd+" not found!")
+                     return;
+                  }
+
+                  const isOk = await handler(args)
+                  if(isOk)
+                     stream.write("succesfully ran: "+cmdStrMsg)
+               }catch(err){
+                  stream.write("internal error!")
+               }
             });
          });
       });
@@ -110,25 +127,43 @@ function makeUI(entries: VaultEntry[]) : string {
    }
    ascii += makeAsciiRow(0,"=".repeat(UIWIDTH))
    ascii += makeAsciiRow(0,"Write command and press enter to perform:")
-   ascii += makeAsciiRow(1,"- Add key value: add new kvp to the vault")
+   ascii += makeAsciiRow(1,"-  [add key value]: add new kvp to the vault")
    ascii += makeAsciiRow(0,"")
 
    return ascii
 }
+const commands: Record<string, (args: string[]) => Promise<boolean>> = {
+   add: addKvp,
+}
 
 const db = new pg.Client({
-    host: "localhost",
-    port: 5432,
-    database: "t80",
-    user: "t80",
-    password: "t80dev",
+   host: "localhost",
+   port: 5432,
+   database: "t80",
+   user: "t80",
+   password: "t80dev",
 })
 
-async function addKvp(key:string,val:string): Promise<string>{
-   db.connect()
-   const {rows} = await db.query(`
-      INSERT INTO kvp (key,value)
-      VALUES($1,$2)
-      `,[key,val]);
-   return rows[0];
+let dbReady: Promise<void> | null = null;
+function ensureDbConnected(): Promise<void> {
+   if (!dbReady) dbReady = db.connect();
+   return dbReady;
+}
+async function addKvp(args:string[]): Promise<boolean>{
+   try{
+      await ensureDbConnected()
+      const key = args[0]
+      const val = args[1]
+      if (!key || !val) {
+         return false;
+      }
+      await db.query(`
+                     INSERT INTO kvps (key,value)
+                     VALUES($1,$2)
+                     `,[key,val]);
+                     return true;
+   }
+   catch(e){
+      return false;
+   }
 }
