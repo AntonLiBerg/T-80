@@ -1,0 +1,4 @@
+interface:
+  display_name: "SSH To Server"
+  short_description: "SSH add command plus kvps verification"
+  default_prompt: "Use $ssh-to-server to connect to 127.0.0.1:2222 with test/test, send add testKey testPass, and verify kvps."

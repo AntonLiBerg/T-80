@@ -4,12 +4,16 @@ import * as pg from "pg";
 
 const SESSION_NR_MAX = 50;
 const SESSION_IDLE_MAX_MS = 60*10*1000;
-const UIWIDTH = 60;
+const UIWIDTH = 120;
 const UIHEIGHT = 30;
-const ROWMIDDLE = 30;
-type VaultEntry = {
+const ROWMIDDLE = Math.floor(UIWIDTH / 2);
+
+type KvpRow = {
+   id: number;
    key: string;
    value: string;
+   created_at: Date | string;
+   updated_at: Date | string;
 };
 
 const hostKey = readFileSync("./host.key");
@@ -67,34 +71,38 @@ new Server({ hostKeys: [hostKey] }, (client) => {
          session.on("shell", (accept) => {
             const stream = accept();
             resetIdleTimer();
-            stream.write("Loading..");
-            getKvps()
-               .then((res: any[])=>{
-                  const strs = res as string[]
-                  stream.write(makeUI(strs))
-               })
+            stream.write("Loading..\n");
+            void getKvps()
+               .then((rows) => {
+                  stream.write(makeUI(rows));
+               });
+
                stream.on("data", async (data: Buffer) => {
                   try{
                      resetIdleTimer();
-                     const split = data.toString().split(" ")
-                     const cmd = split[0]
-                     const args = split.slice(1)
-                     const cmdStrMsg = cmd + "with args: " + args.join(",")
-                     stream.write("trying command: " + cmdStrMsg)
+                     const normalized = data.toString().trim();
+                     if (!normalized) {
+                        return;
+                     }
+                     const split = normalized.split(/\s+/);
+                     const cmd = split[0];
+                     const args = split.slice(1);
+                     const cmdStrMsg = `${cmd} with args: ${args.join(",")}`
+                     stream.write("trying command: " + cmdStrMsg + "\n")
 
                      const handler = cmd ? commands[cmd] : undefined
                      if (!handler) {
-                        stream.write("command "+cmd+" not found!")
+                        stream.write("command "+cmd+" not found!\n")
                         return;
                      }
 
                      const isOk = await handler(args)
                      if(isOk)
-                        stream.write("succesfully ran: "+cmdStrMsg)
+                        stream.write("succesfully ran: "+cmdStrMsg + "\n")
                      else
-                        stream.write("command failed: "+cmdStrMsg)
+                        stream.write("command failed: "+cmdStrMsg + "\n")
                   }catch(err){
-                     stream.write("internal error!")
+                     stream.write("internal error!\n")
                   }
                });
          });
@@ -112,18 +120,72 @@ function makeAsciiRow(colStart:number,text:string){
    return " ".repeat(safeColStart)+text+" ".repeat(padding)+"\n";
 }
 
-function makeUI(entries: string[]) : string {
+function formatColumn(input: string, width: number): string {
+   const normalized = input.replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+   return normalized.length >= width ? normalized : normalized.padEnd(width, " ");
+}
+
+function formatTimestamp(input: Date | string): string {
+   if (input instanceof Date) {
+      return input.toISOString();
+   }
+   const parsed = new Date(input);
+   if (Number.isNaN(parsed.getTime())) {
+      return String(input);
+   }
+   return parsed.toISOString();
+}
+
+function formatKvpLine(entry: {
+   id: string;
+   key: string;
+   value: string;
+   createdAt: string;
+   updatedAt: string;
+}): string {
+   return [
+      formatColumn(entry.id, 6),
+      formatColumn(entry.key, 20),
+      formatColumn(entry.value, 26),
+      formatColumn(entry.createdAt, 28),
+      formatColumn(entry.updatedAt, 28),
+   ].join(" ");
+}
+
+function makeUI(entries: KvpRow[]) : string {
    let ascii = makeAsciiRow(0,"=".repeat(UIWIDTH))
    + makeAsciiRow(ROWMIDDLE - 7,"SSH SECRET VAULT")
    + makeAsciiRow(0,"=".repeat(UIWIDTH))
    + makeAsciiRow(0,"")
-   + makeAsciiRow(5,"Key                  Value");
+   + makeAsciiRow(
+      1,
+      formatKvpLine({
+         id: "ID",
+         key: "KEY",
+         value: "VALUE",
+         createdAt: "CREATED_AT",
+         updatedAt: "UPDATED_AT",
+      }),
+   );
 
    for (const entry of entries) {
-      ascii += makeAsciiRow(5, entry);
+      ascii += makeAsciiRow(
+         1,
+         formatKvpLine({
+            id: String(entry.id),
+            key: entry.key,
+            value: entry.value,
+            createdAt: formatTimestamp(entry.created_at),
+            updatedAt: formatTimestamp(entry.updated_at),
+         }),
+      );
    }
 
-   const rowsBeforePadding = 5 + entries.length;
+   if (entries.length === 0) {
+      ascii += makeAsciiRow(1, "(kvps table is empty)");
+   }
+
+   const rowsBeforePadding = 5 + Math.max(entries.length, 1);
    const blankRows = Math.max(0, UIHEIGHT - rowsBeforePadding - 1);
    for(let i = 0;i<blankRows; i++){
       ascii += makeAsciiRow(0,"")
@@ -170,13 +232,15 @@ async function addKvp(args:string[]): Promise<boolean>{
       return false;
    }
 }
-async function getKvps(): Promise<any[]>{
+async function getKvps(): Promise<KvpRow[]>{
    try{
       await ensureDbConnected()
-      const res = await db.query(`
-                                 SELECT * FROM kvps
-                                 `)
-                                 return res.rows
+      const res = await db.query<KvpRow>(`
+         SELECT id, key, value, created_at, updated_at
+         FROM kvps
+         ORDER BY id ASC
+      `)
+      return res.rows
 
    }catch(err){
       return []
