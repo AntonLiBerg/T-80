@@ -14,11 +14,7 @@ type VaultEntry = {
 
 const hostKey = readFileSync("./host.key");
 let sessions = new Set<Session>()
-const vaultEntries: VaultEntry[] = [
-   { key: "MyTestPassword", value: "passWOrd1234" },
-   { key: "MyOtherTestPassword", value: "passWOrd1234" },
-   { key: "MyFirstTestPassword", value: "passWOrd1234" },
-];
+
 
 // Setup the server and accept only those with the correct login
 new Server({ hostKeys: [hostKey] }, (client) => {
@@ -71,31 +67,36 @@ new Server({ hostKeys: [hostKey] }, (client) => {
          session.on("shell", (accept) => {
             const stream = accept();
             resetIdleTimer();
-            stream.write(makeUI(vaultEntries));
-            stream.on("data", async (data: Buffer) => {
-               try{
-                  resetIdleTimer();
-                  const split = data.toString().split(" ")
-                  const cmd = split[0]
-                  const args = split.slice(1)
-                  const cmdStrMsg = cmd + "with args: " + args.join(",")
-                  stream.write("trying command: " + cmdStrMsg)
+            stream.write("Loading..");
+            getKvps()
+               .then((res: any[])=>{
+                  const strs = res as string[]
+                  stream.write(makeUI(strs))
+               })
+               stream.on("data", async (data: Buffer) => {
+                  try{
+                     resetIdleTimer();
+                     const split = data.toString().split(" ")
+                     const cmd = split[0]
+                     const args = split.slice(1)
+                     const cmdStrMsg = cmd + "with args: " + args.join(",")
+                     stream.write("trying command: " + cmdStrMsg)
 
-                  const handler = cmd ? commands[cmd] : undefined
-                  if (!handler) {
-                     stream.write("command "+cmd+" not found!")
-                     return;
+                     const handler = cmd ? commands[cmd] : undefined
+                     if (!handler) {
+                        stream.write("command "+cmd+" not found!")
+                        return;
+                     }
+
+                     const isOk = await handler(args)
+                     if(isOk)
+                        stream.write("succesfully ran: "+cmdStrMsg)
+                     else
+                        stream.write("command failed: "+cmdStrMsg)
+                  }catch(err){
+                     stream.write("internal error!")
                   }
-
-                  const isOk = await handler(args)
-                  if(isOk)
-                     stream.write("succesfully ran: "+cmdStrMsg)
-                  else
-                     stream.write("command failed: "+cmdStrMsg)
-               }catch(err){
-                  stream.write("internal error!")
-               }
-            });
+               });
          });
       });
    });
@@ -111,7 +112,7 @@ function makeAsciiRow(colStart:number,text:string){
    return " ".repeat(safeColStart)+text+" ".repeat(padding)+"\n";
 }
 
-function makeUI(entries: VaultEntry[]) : string {
+function makeUI(entries: string[]) : string {
    let ascii = makeAsciiRow(0,"=".repeat(UIWIDTH))
    + makeAsciiRow(ROWMIDDLE - 7,"SSH SECRET VAULT")
    + makeAsciiRow(0,"=".repeat(UIWIDTH))
@@ -119,7 +120,7 @@ function makeUI(entries: VaultEntry[]) : string {
    + makeAsciiRow(5,"Key                  Value");
 
    for (const entry of entries) {
-      ascii += makeAsciiRow(5, `${entry.key.padEnd(20, " ")} ${entry.value}`);
+      ascii += makeAsciiRow(5, entry);
    }
 
    const rowsBeforePadding = 5 + entries.length;
@@ -167,5 +168,17 @@ async function addKvp(args:string[]): Promise<boolean>{
    }
    catch(e){
       return false;
+   }
+}
+async function getKvps(): Promise<any[]>{
+   try{
+      await ensureDbConnected()
+      const res = await db.query(`
+                                 SELECT * FROM kvps
+                                 `)
+                                 return res.rows
+
+   }catch(err){
+      return []
    }
 }

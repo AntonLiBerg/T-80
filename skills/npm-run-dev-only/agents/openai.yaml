@@ -1,0 +1,4 @@
+interface:
+  display_name: "NPM Dev Only"
+  short_description: "Run exactly npm run dev and nothing else."
+  default_prompt: "Run npm run dev."
