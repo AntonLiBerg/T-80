@@ -1,3 +1,4 @@
+--KVPS
 CREATE TABLE IF NOT EXISTS kvps (
   id BIGSERIAL PRIMARY KEY,
   key TEXT NOT NULL UNIQUE CHECK (key <> ''),
@@ -20,3 +21,27 @@ CREATE TRIGGER kvps_set_updated_at
 BEFORE UPDATE ON kvps
 FOR EACH ROW
 EXECUTE FUNCTION set_kvps_updated_at();
+
+--USER
+CREATE TABLE IF NOT EXISTS users (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE CHECK (username <> ''),
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION set_users_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS users_set_updated_at ON users;
+
+CREATE TRIGGER kvps_set_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_users_updated_at();
