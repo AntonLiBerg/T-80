@@ -97,8 +97,11 @@ new Server({ hostKeys: [hostKey] }, (client) => {
                      }
 
                      const isOk = await handler(args)
-                     if(isOk)
+                     if(isOk){
                         stream.write("succesfully ran: "+cmdStrMsg + "\n")
+                        const rows = await getKvps()
+                        stream.write(makeUI(rows))
+                     }
                      else
                         stream.write("command failed: "+cmdStrMsg + "\n")
                   }catch(err){
