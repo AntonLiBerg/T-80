@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { makeUI } from "./ascii";
 import type { KvpRow } from "./types";
 
-const WIDTH = 120;
-
 const sampleRow = (overrides: Partial<KvpRow> = {}): KvpRow => ({
    id: 1,
    key: "alpha",
