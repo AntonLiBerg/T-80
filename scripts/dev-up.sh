@@ -3,10 +3,11 @@ set -euo pipefail
 
 COMPOSE_FILE="docker-compose.dev.yaml"
 COMPOSE_CMD=(docker-compose -f "$COMPOSE_FILE")
+STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-1}"
 
 cleanup() {
-  # Keep behavior close to `docker-compose up` where Ctrl+C stops services.
-  "${COMPOSE_CMD[@]}" stop >/dev/null 2>&1 || true
+  # Use a short timeout so Ctrl+C exits quickly but still tries graceful shutdown.
+  "${COMPOSE_CMD[@]}" stop -t "$STOP_TIMEOUT_SECONDS" >/dev/null 2>&1 || true
 }
 
 trap cleanup INT TERM

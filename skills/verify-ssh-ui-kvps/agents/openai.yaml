@@ -1,4 +1,0 @@
-interface:
-  display_name: "Verify SSH UI KVPS"
-  short_description: "Rebuild service and verify SSH UI matches kvps"
-  default_prompt: "Use $verify-ssh-ui-kvps to rebuild ssh-service and validate the SSH connect UI renders all kvps rows from Postgres."

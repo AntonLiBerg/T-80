@@ -1,3 +1,4 @@
+------------------
 --KVPS
 CREATE TABLE IF NOT EXISTS kvps (
   id BIGSERIAL PRIMARY KEY,
@@ -22,6 +23,7 @@ BEFORE UPDATE ON kvps
 FOR EACH ROW
 EXECUTE FUNCTION set_kvps_updated_at();
 
+------------------
 --USER
 CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
@@ -41,7 +43,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS users_set_updated_at ON users;
 
-CREATE TRIGGER kvps_set_updated_at
+CREATE TRIGGER users_set_updated_at
 BEFORE UPDATE ON users
 FOR EACH ROW
 EXECUTE FUNCTION set_users_updated_at();
