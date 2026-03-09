@@ -46,3 +46,17 @@ export async function getKvps(): Promise<KvpRow[]>{
       return []
    }
 }
+export async function getUsers(): Promise<KvpRow[]>{
+   try{
+      await ensureDbConnected()
+      const res = await db.query<KvpRow>(`
+         SELECT *
+         FROM users
+         ORDER BY id ASC
+      `)
+      return res.rows
+
+   }catch(err){
+      return []
+   }
+}

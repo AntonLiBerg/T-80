@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Server, type Session } from "ssh2";
 import { makeUI } from "./ascii"
-import {getKvps,addKvp} from "./db"
+import {getKvps,addKvp,getUsers} from "./db"
 
 const SESSION_NR_MAX = 50;
 const SESSION_IDLE_MAX_MS = 60*10*1000;
@@ -10,7 +10,7 @@ const SESSION_IDLE_MAX_MS = 60*10*1000;
 const hostKey = readFileSync("./host.key");
 let sessions = new Set<Session>()
 
-
+const users = await getUsers()
 new Server({ hostKeys: [hostKey] }, (client) => {
    client.on("error", (err: NodeJS.ErrnoException & { level?: string }) => {
       // Common when a TCP client disconnects before completing the SSH handshake.
@@ -21,6 +21,9 @@ new Server({ hostKeys: [hostKey] }, (client) => {
    });
 
    client.on("authentication",(ctx) => {
+      function tryLogin(name:string, pass:string):boolean{
+
+      }
       if (ctx.method === "password" && ctx.username === "test" && ctx.password === "test") {
          ctx.accept();
       } else {
